@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麻雀役図鑑</title>
+<style>
+  body {
+    background-color:#121212;
+    color:#eee;
+    font-family:sans-serif;
+    margin:0; padding:0;
+  }
+  h1 { text-align:center; margin:20px 0; }
+  .group-container {
+    padding:15px;
+    margin:15px auto;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.1);
+    max-width:1200px;
+  }
+  .group-title {
+    font-size:1.3em; font-weight:bold; margin-bottom:10px;
+  }
+  .yaku-card {
+    width:220px;
+    display:inline-block;
+    vertical-align:top;
+    margin:5px;
+    padding:10px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.1);
+    background:rgba(255,255,255,0.03);
+    cursor:pointer;
+    transition:0.3s;
+    position:relative;
+  }
+  .yaku-card:hover { transform:scale(1.05); border-color:rgba(0,255,255,0.4); }
+  .yaku-title { font-weight:bold; font-size:1.1em; }
+  .yaku-kana { font-size:0.9em; color:#aaa; margin-bottom:5px; }
+  .yaku-desc { font-size:0.8em; color:#ccc; }
+  .yaku-han { font-weight:bold; color:#0ff; float:right; }
+
+  #tile-display {
+    position:fixed;
+    top:50px; right:50px;
+    background:rgba(0,0,0,0.8);
+    padding:10px;
+    border-radius:12px;
+    display:none;
+    z-index:1000;
+  }
+  #tile-display img { width:48px; height:66px; margin:2px; cursor:grab; }
+
+  svg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+  line { stroke:cyan; stroke-width:2; opacity:0.3; transition:0.3s; }
+  line.active { opacity:0.9; stroke-width:3; animation:glow 1s infinite alternate; }
+  @keyframes glow {
+    0% { stroke-width:2; opacity:0.4; }
+    100% { stroke-width:4; opacity:1; }
+  }
+</style>
+</head>
+<body>
+
+<h1>麻雀役図鑑</h1>
+
+<div id="container"></div>
+
+<div id="tile-display"></div>
+<svg id="dep-lines"></svg>
+
+<script>
+
+const yakuData = [
+  // ==== 基本役 ====
+  { name:"立直", kana:"リーチ", han:1, group:["門前清","鳴き不可"], tiles:["1m","2m","3m","4p","5p","6p","3s","4s","5s","東","東","白","白","白"], deps:["一発","門前清自摸和"], frequency:"common", description:"聴牌後に宣言して手を固定し1翻を得る役。", tip:"テンパイしたら基本的に狙うべき役。" },
+  { name:"一発", kana:"イッパツ", han:1, group:["門前清","鳴き不可"], tiles:["2m","3m","4m","5p","6p","7p","3s","4s","5s","白","白","中","中","中"], deps:["立直"], frequency:"uncommon", description:"リーチ後1巡以内に和了すると成立する1翻役。", tip:"リーチ直後のツモに注目。" },
+  { name:"門前清自摸和", kana:"メンゼンチンツモホー", han:1, group:["門前清","鳴き不可"], tiles:["2m","3m","4m","5p","6p","7p","3s","4s","5s","南","南","白","白","白"], deps:[], frequency:"common", description:"門前で自摸和了すると成立する1翻役。", tip:"リーチ不要でもツモれば1翻。" },
+
+  // ==== 断么九・平和系 ====
+  { name:"断么九", kana:"タンヤオ", han:1, group:["鳴き可","数牌系"], tiles:["2m","3m","4m","5p","6p","7p","3s","4s","5s","6s","7s","8s","4p","5p"], deps:[], frequency:"common", description:"2〜8の数牌のみで構成された役。", tip:"鳴いても成立する使いやすい役。" },
+  { name:"平和", kana:"ピンフ", han:1, group:["門前清","数牌系","順子主体"], tiles:["1m","2m","3m","4p","5p","6p","3s","4s","5s","7s","8s","9s","中","中"], deps:["断么九"], frequency:"common", description:"すべて順子で構成、頭が役牌でない1翻役。", tip:"安定した構成で狙いやすい。" },
+  { name:"一盃口", kana:"イーペーコー", han:1, group:["門前清","順子主体"], tiles:["2m","3m","4m","2m","3m","4m","5p","6p","7p","3s","4s","5s","白","白"], deps:[], frequency:"common", description:"同じ順子を2組揃える1翻役。", tip:"平和と相性が良い形。" },
+  { name:"二盃口", kana:"リャンペーコー", han:3, group:["門前清","順子主体"], tiles:["2m","3m","4m","2m","3m","4m","5p","6p","7p","5p","6p","7p","中","中"], deps:["一盃口"], frequency:"uncommon", description:"一盃口を2組含む3翻役。", tip:"成立すれば大きな得点に。" },
+
+  // ==== 役牌 ====
+  { name:"役牌（東）", kana:"ヤクハイ（トン）", han:1, group:["役牌","字牌系"], tiles:["東","東","東","2m","3m","4m","5p","6p","7p","3s","4s","5s","白","白"], deps:[], frequency:"common", description:"東の刻子を揃えると成立する1翻役。", tip:"場風・自風なら優先して狙う。" },
+  { name:"役牌（南）", kana:"ヤクハイ（ナン）", han:1, group:["役牌","字牌系"], tiles:["南","南","南","1m","2m","3m","4p","5p","6p","3s","4s","5s","白","白"], deps:[], frequency:"common", description:"南の刻子を揃えると成立する1翻役。", tip:"副露しても強い役。" },
+  { name:"役牌（西）", kana:"ヤクハイ（シャー）", han:1, group:["役牌","字牌系"], tiles:["西","西","西","1m","2m","3m","4p","5p","6p","3s","4s","5s","白","白"], deps:[], frequency:"common", description:"西の刻子を揃える1翻役。", tip:"字牌優先で狙いたい。" },
+  { name:"役牌（北）", kana:"ヤクハイ（ペー）", han:1, group:["役牌","字牌系"], tiles:["北","北","北","1m","2m","3m","4p","5p","6p","3s","4s","5s","白","白"], deps:[], frequency:"common", description:"北の刻子を揃える1翻役。", tip:"比較的成立しやすい。" },
+  { name:"役牌（白）", kana:"ヤクハイ（ハク）", han:1, group:["役牌","字牌系"], tiles:["白","白","白","2m","3m","4m","5p","6p","7p","3s","4s","5s","東","東"], deps:[], frequency:"common", description:"白の刻子を揃える1翻役。", tip:"鳴いてもOK。" },
+  { name:"役牌（發）", kana:"ヤクハイ（ハツ）", han:1, group:["役牌","字牌系"], tiles:["發","發","發","2m","3m","4m","5p","6p","7p","3s","4s","5s","東","東"], deps:[], frequency:"common", description:"發の刻子を揃える1翻役。", tip:"役牌のなかでも比較的多い1翻役。" },
+  { name:"役牌（中）", kana:"ヤクハイ（チュン）", han:1, group:["役牌","字牌系"], tiles:["中","中","中","1m","2m","3m","4p","5p","6p","7s","8s","9s","東","東"], deps:[], frequency:"common", description:"中牌の刻子を揃える1翻役。", tip:"副露でも強い1翻役。" },
+
+  // ==== チャンタ系 ====
+  { name:"混全帯么九", kana:"チャンタ", han:2, group:["鳴き可","チャンタ系"], tiles:["1m","2m","3m","東","東","2p","3p","4p","5s","6s","7s","中","中"], deps:["純全帯么九","清老頭","ホンロウ"], frequency:"uncommon", description:"各面子に1か9または字牌を含む2翻役。", tip:"他の役と複合しやすい。" },
+  { name:"純全帯么九", kana:"ジュンチャン", han:3, group:["鳴き可","チャンタ系","数牌系"], tiles:["1m","2m","3m","7m","8m","9m","2p","3p","4p","7p","8p","9p","3s","4s"], deps:["混全帯么九","清老頭","ホンロウ"], frequency:"uncommon", description:"数牌のみで各面子に1か9を含む3翻役。", tip:"チャンタより高得点。" },
+
+  // ==== 色指定 ====
+  { name:"混一色", kana:"ホンイーソー", han:3, group:["鳴き可","色指定"], tiles:["1m","2m","3m","4m","5m","6m","東","東","白","白","南","南","中","中"], deps:[], frequency:"uncommon", description:"ひとつの色＋字牌で構成される3翻役。", tip:"鳴いても成立する。" },
+  { name:"清一色", kana:"チンイーソー", han:6, group:["色指定","数牌系"], tiles:["1p","2p","3p","4p","5p","6p","7p","8p","9p","2p","2p","3p","3p"], deps:["混一色"], frequency:"rare", description:"ひとつの色のみで構成される6翻役。", tip:"非常に強力な色役。" },
+
+  // ==== 老頭系 ====
+  { name:"清老頭", kana:"チンロートウ", han:2, group:["老頭","数牌系"], tiles:["1m","1m","9m","9m","1p","1p","9p","9p","1s","1s","9s","9s","2m","3p"], deps:["混全帯么九","純全帯么九","ホンロウ"], frequency:"rare", description:"全て1と9の数牌で構成される役。", tip:"ジュンチャン／チャンタと同時成立する場合も。" },
+
+  // ==== 七対子 ====
+  { name:"七対子", kana:"チートイツ", han:2, group:["対子主体"], tiles:["1m","1m","2m","2m","3p","3p","4p","4p","5s","5s","6s","6s","白","白"], deps:[], frequency:"uncommon", description:"七つの対子で構成される2翻役。", tip:"他の形と比べても成立しやすい。" },
+
+  // ==== 役満 ====
+  { name:"国士無双", kana:"コクシムソウ", han:13, group:["門前清","役満","老頭","字牌系"], tiles:["1m","9m","1p","9p","1s","9s","東","南","西","北","白","發","中"], deps:["十三面待ち"], frequency:"rare", description:"字牌・ヤオチュー牌すべて一枚ずつ揃える役満。", tip:"門前限定。十三面待ちを含む形もある。" },
+  { name:"十三面待ち", kana:"ジュウサンメンマチ", han:13, group:["門前清","役満","老頭","字牌系"], tiles:["1m","9m","1p","9p","1s","9s","東","南","西","北","白","發","中"], deps:["国士無双"], frequency:"rare", description:"国士無双の最終形として1枚待ちで完成する役満。", tip:"完全待ち。" },
+  { name:"小三元", kana:"ショウサンゲン", han:13, group:["役満","字牌系"], tiles:["白","白","白","發","發","發","中","中","1m","2m","3m","4p","5p","6p"], deps:["大三元"], frequency:"rare", description:"三元牌のうち2つを刻子で揃える役満。", tip:"大三元の下位役。" },
+  { name:"大三元", kana:"ダイサンゲン", han:13, group:["役満","字牌系"], tiles:["白","白","白","發","發","發","中","中","中","1m","2m","3m","4p","5p"], deps:["小三元"], frequency:"rare", description:"三元牌すべてを刻子で揃える役満。", tip:"字牌系最高役の一つ。" },
+  { name:"小四喜", kana:"ショウスーシー", han:13, group:["役満","字牌系"], tiles:["東","東","南","南","西","西","北","2m","3m","4m","5p","6p","7p"], deps:["大四喜"], frequency:"rare", description:"風牌4種のうち3種を刻子、残りを雀頭にした役満。", tip:"大四喜の下位役。" },
+  { name:"大四喜", kana:"ダイスーシー", han:13, group:["役満","字牌系"], tiles:["東","東","東","南","南","南","西","西","西","北","北","北","1m","2m"], deps:["小四喜"], frequency:"rare", description:"風牌4種すべてを刻子で揃える役満。", tip:"字牌系最高位役。" },
+  { name:"四暗刻", kana:"スーアンコウ", han:13, group:["門前清","役満","対子主体"], tiles:["2m","2m","3p","3p","4p","4p","5s","5s","6s","6s","7s","7s","8s","8s"], deps:["四暗刻単騎"], frequency:"rare", description:"4組の暗刻を揃えた役満。", tip:"門前で揃えることが必須。" },
+  { name:"四暗刻単騎", kana:"スーアンコウタンキ", han:13, group:["門前清","役満","対子主体"], tiles:["2m","2m","3p","3p","4p","4p","5s","5s","6s","6s","7s","7s","8s","8s"], deps:["四暗刻"], frequency:"rare", description:"四暗刻の最終形で、単騎待ちで和了る役満。", tip:"最終形でのみ成立。" }
+];
+
+// グループ色
+const groupColors = {
+  "門前清":"#2e3a59",
+  "鳴き可":"#3a523e",
+  "字牌系":"#5a3a3a",
+  "老頭":"#5a4a3a",
+  "役満":"#3a3a5a",
+  "数牌系":"#3a5a5a",
+  "チャンタ系":"#5a3a5a",
+  "順子主体":"#3a5a3a",
+  "対子主体":"#5a5a3a",
+  "色指定":"#4a5a5a"
+};
+
+const container = document.getElementById('container');
+const tileDisplay = document.getElementById('tile-display');
+const svg = document.getElementById('dep-lines');
+
+const groupMap = {};
+yakuData.forEach((yaku,i)=>{
+  yaku.index=i;
+  yaku.group.forEach(g=>{
+    if(!groupMap[g]) groupMap[g]=[];
+    groupMap[g].push(yaku);
+  });
+});
+
+// カード生成
+Object.keys(groupMap).forEach(gName=>{
+  const groupDiv = document.createElement('div');
+  groupDiv.className='group-container';
+  groupDiv.style.backgroundColor=groupColors[gName]||"rgba(255,255,255,0.03)";
+  groupDiv.innerHTML=`<div class="group-title">${gName}</div>`;
+  container.appendChild(groupDiv);
+
+  groupMap[gName].forEach(yaku=>{
+    const card = document.createElement('div');
+    card.className='yaku-card';
+    card.dataset.index=yaku.index;
+    card.innerHTML = `<div class="yaku-title">${yaku.name}<span class="yaku-han">${yaku.han}翻</span></div>
+                      <div class="yaku-kana">${yaku.kana}</div>
+                      <div class="yaku-desc">${yaku.description}</div>`;
+    groupDiv.appendChild(card);
+
+    card.addEventListener('click',()=>{
+      tileDisplay.innerHTML='';
+      yaku.tiles.forEach(tile=>{
+        const img = document.createElement('img');
+        img.src=`images/${tile}.png`;
+        tileDisplay.appendChild(img);
+      });
+      tileDisplay.style.display='block';
+    });
+  });
+});
+
+// 依存線描画
+function drawLines() {
+  svg.innerHTML='';
+  const cards = document.querySelectorAll('.yaku-card');
+  const cardPos = [];
+  cards.forEach(c=>{
+    const rect = c.getBoundingClientRect();
+    cardPos.push({x:rect.left+rect.width/2, y:rect.top+rect.height/2, index:c.dataset.index});
+  });
+
+  yakuData.forEach(yaku=>{
+    const from = cardPos[yaku.index];
+    yaku.deps.forEach(depName=>{
+      const toYaku = yakuData.find(d=>d.name===depName);
+      if(toYaku){
+        const to = cardPos[toYaku.index];
+        const line = document.createElementNS("http://www.w3.org/2000/svg",'line');
+        line.setAttribute('x1',from.x); line.setAttribute('y1',from.y);
+        line.setAttribute('x2',to.x); line.setAttribute('y2',to.y);
+        svg.appendChild(line);
+      }
+    });
+  });
+}
+
+window.addEventListener('load',drawLines);
+window.addEventListener('resize',drawLines);
+
+</script>
+</body>
+</html>
